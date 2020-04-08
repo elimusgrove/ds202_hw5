@@ -1,0 +1,69 @@
+---
+title: "DS202 Homework 5: Eli Musgrove"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+### \#1
+```{r}
+# Libraries
+suppressWarnings(suppressMessages(library(readr)))
+suppressWarnings(suppressMessages(library(tidyverse)))
+suppressWarnings(suppressMessages(library(lubridate)))
+suppressWarnings(suppressMessages(library(ggrepel)))
+suppressWarnings(suppressMessages(library(readxl)))
+
+# Import data
+liquor = suppressMessages(read_csv('2019_Iowa_Liquor_Sales.csv'))
+```
+
+### \#2
+```{r}
+# Extract latitude and longitude
+liquor$`Store Location` = gsub("[^0-9.-]", " ", liquor$`Store Location`)
+liquor$`Store Location` = trimws(liquor$`Store Location`)
+liquor = liquor %>% separate(`Store Location`, into=c('latitude', 'longitude'), remove=FALSE, sep=" ", convert=TRUE)
+
+# Convert columns to proper type
+liquor$`Vendor Number` = as.numeric(liquor$`Vendor Number`)
+liquor$`Invoice/Item Number` = as.numeric(gsub("[^0-9]", "", liquor$`Invoice/Item Number`))
+liquor$Date = mdy(liquor$Date)
+
+# Extract year, month, day from Date
+liquor$Month = month(liquor$Date)
+liquor$Day = day(liquor$Date)
+liquor$Year = year(liquor$Date)
+```
+
+### \#3
+
+##### 3a. There are obvious clumps of stores in areas like campustown and north/south Ames. There are also regions where no stores that sell alcohol are located - these are likely residential-only zoned areas.
+
+##### 3b. Vodka is the most popular which makes sense because of how cheap and standard it is. It surprised me that Canadian whiskey would be 2nd place after standard vodka though. Because Ames is a college town, there are very few sophisticated/expensive drinks and it is mostly focused on hard alcohol which also makes sense.
+```{r}
+# 3a
+liquor %>% distinct(`Store Name`, .keep_all=TRUE) %>% ggplot(aes(x=latitude, y=longitude, label=`Store Name`)) + geom_text_repel() + geom_point(color='red', position='jitter') + ggtitle('Ames, Iowa Liquor Stores')
+
+# 3b
+liquor %>% group_by(`Category Name`) %>% summarize(Gallons_Sold = sum(`Volume Sold (Gallons)`)) %>% select(`Category Name`, Gallons_Sold) %>% ggplot(aes(x=reorder(`Category Name`, -Gallons_Sold), y=Gallons_Sold, fill=Gallons_Sold)) + geom_bar(stat="identity") + coord_flip() + xlab('Liquor Category') + ylab('Volume Sold (Gallons)')
+```
+
+### \#4
+```{r}
+daily_sold = liquor %>% group_by(Date) %>% summarize(num_sales=n(), volume_sold=sum(`Volume Sold (Gallons)`), total_spent=sum(`Sale (Dollars)`))
+head(daily_sold)
+```
+
+### \#5
+
+##### The biggest trend this reveals is the big spike in sales that happens every weekend. It calms down during the week but tends to spike high above weekday sales during the weekend. May-July are also lower months as students are studying for finals and leaving Ames when the semester is over.
+```{r}
+daily_sold %>% ggplot(aes(x=day(Date), y=volume_sold)) + geom_point() + geom_smooth(method='lm') + ylim(0, 4000) + facet_wrap(~month(Date))
+```
+
+### \#6
+
+##### The first football game in 2019 was on 8/31/2019, which was a very high day for volume sold. The night before was the night with the primary partying since this date had the highest volume sold for August. 9/14/2019 was the next football game and the night before and day of were tied for volume sold with 9/28/2019, another football game date. This trend continues with the other game days for the rest of the season. One interesting thing was that the night before the game always seems to be the largest volume sold between that day and the gameday itself. I had planned on using the cyclones football dataset we were given, but it doesn't have dates for the games included.
